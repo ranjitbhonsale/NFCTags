@@ -23,7 +23,7 @@ jobs:
         env:
           ENCODED_KEYSTORE: ${{ secrets.KEYSTORE_FILE }}
         run: |
-          echo $ENCODED_KEYSTORE | base64 -d > keystore.jks
+          echo "$ENCODED_KEYSTORE" | base64 --decode > keystore.jks
 
       - name: Build Release AAB
         env:
