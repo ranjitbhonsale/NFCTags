@@ -2,6 +2,7 @@ plugins {
   alias(libs.plugins.android.application)
   alias(libs.plugins.compose.compiler)
   alias(libs.plugins.kotlin.serialization)
+  id("kotlin-kapt")
 }
 
 android {
@@ -81,8 +82,15 @@ dependencies {
   implementation(libs.androidx.navigation3.ui)
   implementation(libs.androidx.navigation3.runtime)
   implementation(libs.androidx.lifecycle.viewmodel.navigation3)
+  implementation("androidx.navigation:navigation-compose:2.7.7")
 
   // Networking and QR Scanning
   implementation("com.squareup.okhttp3:okhttp:4.12.0")
   implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+
+  // Room Database for Scan History
+  val room_version = "2.6.1"
+  implementation("androidx.room:room-runtime:$room_version")
+  implementation("androidx.room:room-ktx:$room_version")
+  kapt("androidx.room:room-compiler:$room_version")
 }

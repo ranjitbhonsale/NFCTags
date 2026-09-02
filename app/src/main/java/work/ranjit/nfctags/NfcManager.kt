@@ -9,7 +9,11 @@ import android.nfc.tech.Ndef
 import android.nfc.tech.NdefFormatable
 import android.nfc.NdefMessage
 import android.nfc.NdefRecord
+import android.os.Build
 import android.os.Bundle
+import android.os.VibrationEffect
+import android.os.Vibrator
+import android.os.VibratorManager
 import android.util.Log
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,10 +21,15 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.io.IOException
 import java.nio.charset.Charset
 
+enum class NdefPayloadType {
+    TEXT, URI, UNKNOWN
+}
+
 data class NfcTagData(
     val tagId: String = "",
     val technologies: List<String> = emptyList(),
     val payload: String = "",
+    val payloadType: NdefPayloadType = NdefPayloadType.UNKNOWN,
     val isWritable: Boolean = false,
     val type: String = "Unknown"
 )
@@ -32,10 +41,31 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
     private val _tagData = MutableStateFlow(NfcTagData())
     val tagData: StateFlow<NfcTagData> = _tagData.asStateFlow()
 
-    private val _statusMessage = MutableStateFlow("Waiting for NFC tag...")
+    private val _statusMessage = MutableStateFlow("Tap a tag to the back of your phone")
     val statusMessage: StateFlow<String> = _statusMessage.asStateFlow()
 
     private var currentTag: Tag? = null
+
+    private fun triggerHapticFeedback() {
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+                val vibratorManager = activity.getSystemService(Context.VIBRATOR_MANAGER_SERVICE) as VibratorManager
+                val vibrator = vibratorManager.defaultVibrator
+                vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+            } else {
+                @Suppress("DEPRECATION")
+                val vibrator = activity.getSystemService(Context.VIBRATOR_SERVICE) as Vibrator
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    vibrator.vibrate(VibrationEffect.createPredefined(VibrationEffect.EFFECT_CLICK))
+                } else {
+                    @Suppress("DEPRECATION")
+                    vibrator.vibrate(50)
+                }
+            }
+        } catch (e: Exception) {
+            // Ignore if vibration fails or requires permission we don't have
+        }
+    }
 
     fun enableReaderMode() {
         if (nfcAdapter != null) {
@@ -51,7 +81,7 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
                         NfcAdapter.FLAG_READER_NFC_BARCODE,
                 options
             )
-            _statusMessage.value = "NFC Reader Mode Enabled. Bring a tag close."
+            _statusMessage.value = "Ready to scan. Tap a tag to your phone."
         } else {
             _statusMessage.value = "NFC is not available on this device."
         }
@@ -64,11 +94,13 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
     override fun onTagDiscovered(tag: Tag?) {
         if (tag == null) return
         currentTag = tag
+        triggerHapticFeedback()
         
         val idHex = bytesToHex(tag.id)
         val techList = tag.techList.map { it.substringAfterLast('.') }
         
-        var payloadText = "No NDEF content"
+        var payloadText = "Empty tag"
+        var pType = NdefPayloadType.UNKNOWN
         var writable = false
         var tagType = "Unknown"
 
@@ -80,10 +112,13 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
                 ndef.connect()
                 val ndefMessage = ndef.ndefMessage
                 if (ndefMessage != null) {
-                    payloadText = readTextFromMessage(ndefMessage)
+                    val (text, type) = parseMessage(ndefMessage)
+                    payloadText = text
+                    pType = type
                 }
             } catch (e: Exception) {
                 Log.e("NfcManager", "Error reading NDEF", e)
+                payloadText = "Error reading tag data"
             } finally {
                 try { ndef.close() } catch (e: Exception) {}
             }
@@ -91,7 +126,7 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
             val mifareClassic = MifareClassic.get(tag)
             if (mifareClassic != null) {
                 tagType = "Mifare Classic"
-                payloadText = "Mifare Classic detected. Use password (key) to read/write sectors."
+                payloadText = "Mifare Classic detected."
             }
         }
 
@@ -99,17 +134,18 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
             tagId = idHex,
             technologies = techList,
             payload = payloadText,
+            payloadType = pType,
             isWritable = writable,
             type = tagType
         )
         
-        _statusMessage.value = "Tag Detected!"
+        _statusMessage.value = "Tag Detected Successfully!"
     }
     
-    fun writeNdefMessage(text: String, passwordHex: String = "") {
+    fun writeNdefMessage(text: String, isUri: Boolean = false, passwordHex: String = "") {
         val tag = currentTag
         if (tag == null) {
-            _statusMessage.value = "No tag available to write."
+            _statusMessage.value = "No tag detected. Please scan a tag first."
             return
         }
 
@@ -117,19 +153,22 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
 
         try {
             val ndef = Ndef.get(tag)
+            val message = if (text.isEmpty()) {
+                NdefMessage(arrayOf(NdefRecord(NdefRecord.TNF_EMPTY, null, null, null)))
+            } else if (isUri) {
+                NdefRecord.createUri(text)?.let { NdefMessage(arrayOf(it)) } ?: createTextNdefMessage(text)
+            } else {
+                createTextNdefMessage(text)
+            }
+
             if (ndef != null) {
                 ndef.connect()
-                
-                // Password functionality for NDEF tags (like NTAG21x) requires raw commands.
-                // For simplicity, we are implementing plain NDEF write here.
-                // Advanced password handling is complex and hardware specific.
                 
                 if (!ndef.isWritable) {
                     _statusMessage.value = "Tag is read-only."
                     return
                 }
                 
-                val message = createTextNdefMessage(text)
                 if (ndef.maxSize < message.toByteArray().size) {
                     _statusMessage.value = "Message too large for this tag."
                     return
@@ -137,21 +176,25 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
                 
                 ndef.writeNdefMessage(message)
                 _statusMessage.value = "Successfully wrote to tag."
+                triggerHapticFeedback()
                 
                 // update payload view
-                _tagData.value = _tagData.value.copy(payload = text)
+                _tagData.value = _tagData.value.copy(
+                    payload = if (text.isEmpty()) "Empty tag" else text,
+                    payloadType = if (text.isEmpty()) NdefPayloadType.UNKNOWN else if (isUri) NdefPayloadType.URI else NdefPayloadType.TEXT
+                )
                 
             } else {
                 val formatable = NdefFormatable.get(tag)
                 if (formatable != null) {
                     formatable.connect()
-                    val message = createTextNdefMessage(text)
                     formatable.format(message)
                     _statusMessage.value = "Successfully formatted and wrote to tag."
+                    triggerHapticFeedback()
                 } else {
                     // Try Mifare Classic write if applicable
                     val mifare = MifareClassic.get(tag)
-                    if (mifare != null) {
+                    if (mifare != null && !isUri && text.isNotEmpty()) {
                        writeMifareClassic(mifare, text, passwordHex)
                     } else {
                         _statusMessage.value = "Tag does not support NDEF."
@@ -179,7 +222,8 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
                 val blockIndex = mifare.sectorToBlock(1)
                 val data = text.toByteArray(Charset.forName("US-ASCII")).copyOf(16) // Max 16 bytes per block
                 mifare.writeBlock(blockIndex, data)
-                _statusMessage.value = "Successfully wrote to Mifare Classic Sector 1."
+                _statusMessage.value = "Successfully wrote to Mifare Classic."
+                triggerHapticFeedback()
             } else {
                 _statusMessage.value = "Mifare Classic authentication failed."
             }
@@ -205,21 +249,39 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
         return NdefMessage(arrayOf(record))
     }
 
-    private fun readTextFromMessage(message: NdefMessage): String {
+    private fun parseMessage(message: NdefMessage): Pair<String, NdefPayloadType> {
         val records = message.records
-        for (record in records) {
-            if (record.tnf == NdefRecord.TNF_WELL_KNOWN && record.type.contentEquals(NdefRecord.RTD_TEXT)) {
-                val payload = record.payload
-                val languageCodeLength = (payload[0].toInt() and 0x3F)
-                return String(
-                    payload,
-                    languageCodeLength + 1,
-                    payload.size - languageCodeLength - 1,
-                    Charset.forName("UTF-8")
-                )
-            }
+        if (records.isEmpty()) return Pair("Empty", NdefPayloadType.UNKNOWN)
+        
+        val record = records[0]
+        
+        // Check for URI
+        if (record.tnf == NdefRecord.TNF_WELL_KNOWN && record.type.contentEquals(NdefRecord.RTD_URI)) {
+            val payload = record.payload
+            val prefix = URI_PREFIX_MAP[payload[0]] ?: ""
+            val fullUri = prefix + String(payload, 1, payload.size - 1, Charset.forName("UTF-8"))
+            return Pair(fullUri, NdefPayloadType.URI)
         }
-        return "Unsupported NDEF content"
+        
+        // Check for Smart Poster containing URI
+        if (record.tnf == NdefRecord.TNF_WELL_KNOWN && record.type.contentEquals(NdefRecord.RTD_SMART_POSTER)) {
+            return Pair("Smart Poster URI", NdefPayloadType.URI) // Simplification
+        }
+        
+        // Check for Text
+        if (record.tnf == NdefRecord.TNF_WELL_KNOWN && record.type.contentEquals(NdefRecord.RTD_TEXT)) {
+            val payload = record.payload
+            val languageCodeLength = (payload[0].toInt() and 0x3F)
+            val text = String(
+                payload,
+                languageCodeLength + 1,
+                payload.size - languageCodeLength - 1,
+                Charset.forName("UTF-8")
+            )
+            return Pair(text, NdefPayloadType.TEXT)
+        }
+        
+        return Pair("Unsupported format", NdefPayloadType.UNKNOWN)
     }
 
     private fun bytesToHex(bytes: ByteArray): String {
@@ -242,5 +304,46 @@ class NfcManager(private val activity: Activity) : NfcAdapter.ReaderCallback {
             i += 2
         }
         return data
+    }
+    
+    companion object {
+        private val URI_PREFIX_MAP = mapOf(
+            0x00.toByte() to "",
+            0x01.toByte() to "http://www.",
+            0x02.toByte() to "https://www.",
+            0x03.toByte() to "http://",
+            0x04.toByte() to "https://",
+            0x05.toByte() to "tel:",
+            0x06.toByte() to "mailto:",
+            0x07.toByte() to "ftp://anonymous:anonymous@",
+            0x08.toByte() to "ftp://ftp.",
+            0x09.toByte() to "ftps://",
+            0x0A.toByte() to "sftp://",
+            0x0B.toByte() to "smb://",
+            0x0C.toByte() to "nfs://",
+            0x0D.toByte() to "ftp://",
+            0x0E.toByte() to "dav://",
+            0x0F.toByte() to "news:",
+            0x10.toByte() to "telnet://",
+            0x11.toByte() to "imap:",
+            0x12.toByte() to "rtsp://",
+            0x13.toByte() to "urn:",
+            0x14.toByte() to "pop:",
+            0x15.toByte() to "sip:",
+            0x16.toByte() to "sips:",
+            0x17.toByte() to "tftp:",
+            0x18.toByte() to "btspp://",
+            0x19.toByte() to "btl2cap://",
+            0x1A.toByte() to "btgoep://",
+            0x1B.toByte() to "tcpobex://",
+            0x1C.toByte() to "irdaobex://",
+            0x1D.toByte() to "file://",
+            0x1E.toByte() to "urn:epc:id:",
+            0x1F.toByte() to "urn:epc:tag:",
+            0x20.toByte() to "urn:epc:pat:",
+            0x21.toByte() to "urn:epc:raw:",
+            0x22.toByte() to "urn:epc:",
+            0x23.toByte() to "urn:nfc:"
+        )
     }
 }

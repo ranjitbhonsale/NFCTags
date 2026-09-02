@@ -1,28 +1,39 @@
 package work.ranjit.nfctags
 
-import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.List
+import androidx.compose.material.icons.filled.Nfc
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.unit.dp
+import androidx.lifecycle.lifecycleScope
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.currentBackStackEntryAsState
+import androidx.navigation.compose.rememberNavController
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanIntentResult
 import com.journeyapps.barcodescanner.ScanOptions
 import kotlinx.coroutines.launch
+import work.ranjit.nfctags.data.AppDatabase
+import work.ranjit.nfctags.data.ScanHistoryEntity
 import work.ranjit.nfctags.theme.NFCReaderWriterTheme
+import work.ranjit.nfctags.ui.HistoryScreen
+import work.ranjit.nfctags.ui.ScannerScreen
+import work.ranjit.nfctags.ui.WebhookScreen
 
 class MainActivity : ComponentActivity() {
     private lateinit var nfcManager: NfcManager
     private lateinit var tagEventManager: TagEventManager
     private lateinit var networkManager: NetworkManager
+    private lateinit var database: AppDatabase
 
     private var qrScanResult by mutableStateOf("")
 
@@ -45,15 +56,108 @@ class MainActivity : ComponentActivity() {
         nfcManager = NfcManager(this)
         tagEventManager = TagEventManager(this)
         networkManager = NetworkManager()
+        database = AppDatabase.getDatabase(this)
 
         enableEdgeToEdge()
         setContent {
             NFCReaderWriterTheme {
-                Surface(
+                val navController = rememberNavController()
+                val tagData by nfcManager.tagData.collectAsState()
+                val statusMessage by nfcManager.statusMessage.collectAsState()
+                
+                // Webhook trigger logic
+                LaunchedEffect(tagData.tagId) {
+                    if (tagData.tagId.isNotEmpty()) {
+                        val event = tagEventManager.getEvent(tagData.tagId)
+                        var webhookRes = ""
+                        
+                        if (event != null) {
+                            val dataToSend = if (tagData.payload.isNotEmpty() && tagData.payload != "Empty tag" && !tagData.payload.startsWith("Mifare Classic")) {
+                                tagData.payload
+                            } else {
+                                tagData.tagId
+                            }
+                            
+                            webhookRes = networkManager.sendNfcData(event.url, dataToSend, event.isPost)
+                        }
+                        
+                        // Save to history
+                        lifecycleScope.launch {
+                            database.scanHistoryDao().insert(
+                                ScanHistoryEntity(
+                                    timestamp = System.currentTimeMillis(),
+                                    tagId = tagData.tagId,
+                                    payload = tagData.payload,
+                                    webhookResult = webhookRes.ifEmpty { null }
+                                )
+                            )
+                        }
+                    }
+                }
+
+                Scaffold(
                     modifier = Modifier.fillMaxSize(),
-                    color = Color.White
-                ) {
-                    NfcAppContent(this, nfcManager, tagEventManager, networkManager, qrScanResult)
+                    bottomBar = {
+                        NavigationBar {
+                            val navBackStackEntry by navController.currentBackStackEntryAsState()
+                            val currentRoute = navBackStackEntry?.destination?.route
+
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Filled.Nfc, contentDescription = "Scanner") },
+                                label = { Text("Scanner") },
+                                selected = currentRoute == "scanner",
+                                onClick = {
+                                    navController.navigate("scanner") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Filled.Build, contentDescription = "Automations") },
+                                label = { Text("Automations") },
+                                selected = currentRoute == "automations",
+                                onClick = {
+                                    navController.navigate("automations") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                            NavigationBarItem(
+                                icon = { Icon(Icons.Filled.List, contentDescription = "History") },
+                                label = { Text("History") },
+                                selected = currentRoute == "history",
+                                onClick = {
+                                    navController.navigate("history") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                        }
+                    }
+                ) { innerPadding ->
+                    NavHost(
+                        navController = navController,
+                        startDestination = "scanner",
+                        modifier = Modifier.padding(innerPadding)
+                    ) {
+                        composable("scanner") {
+                            ScannerScreen(nfcManager, tagData, statusMessage)
+                        }
+                        composable("automations") {
+                            WebhookScreen(tagData, tagEventManager, qrScanResult) {
+                                launchQrScanner()
+                            }
+                        }
+                        composable("history") {
+                            HistoryScreen(database.scanHistoryDao())
+                        }
+                    }
                 }
             }
         }
@@ -67,191 +171,5 @@ class MainActivity : ComponentActivity() {
     override fun onPause() {
         super.onPause()
         nfcManager.disableReaderMode()
-    }
-}
-
-@Composable
-fun NfcAppContent(
-    activity: MainActivity,
-    nfcManager: NfcManager,
-    tagEventManager: TagEventManager,
-    networkManager: NetworkManager,
-    scannedQrUrl: String
-) {
-    val statusMessage by nfcManager.statusMessage.collectAsState()
-    val tagData by nfcManager.tagData.collectAsState()
-
-    var textToWrite by remember { mutableStateOf("") }
-    var passwordHex by remember { mutableStateOf("") }
-
-    // Event assignment state
-    var eventUrl by remember(scannedQrUrl) { mutableStateOf(scannedQrUrl) }
-    var isPost by remember { mutableStateOf(false) }
-    
-    // Server response state
-    var serverResponse by remember { mutableStateOf("") }
-    val scope = rememberCoroutineScope()
-
-    // Listen to tag changes and execute event if assigned
-    LaunchedEffect(tagData.tagId) {
-        if (tagData.tagId.isNotEmpty()) {
-            val event = tagEventManager.getEvent(tagData.tagId)
-            if (event != null) {
-                serverResponse = "Sending request to ${event.url}..."
-                val dataToSend = if (tagData.payload.isNotEmpty() && tagData.payload != "No NDEF content" && !tagData.payload.startsWith("Mifare Classic")) {
-                    tagData.payload
-                } else {
-                    tagData.tagId
-                }
-                
-                val result = networkManager.sendNfcData(event.url, dataToSend, event.isPost)
-                serverResponse = result
-            } else {
-                serverResponse = "No event assigned to this tag."
-            }
-        }
-    }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-            .padding(top = 32.dp, bottom = 32.dp)
-            .verticalScroll(rememberScrollState())
-    ) {
-        Text(
-            text = "NFC Reader & Writer",
-            style = MaterialTheme.typography.headlineMedium,
-            color = Color.Black
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(text = "Status: $statusMessage", color = Color.Gray)
-        
-        Spacer(modifier = Modifier.height(24.dp))
-        
-        // Tag Info Section
-        Text(text = "Tag Information", style = MaterialTheme.typography.titleMedium, color = Color.Black)
-        Divider(color = Color.LightGray, modifier = Modifier.padding(vertical = 8.dp))
-        
-        Text(text = "Tag ID: ${tagData.tagId.ifEmpty { "None" }}", color = Color.Black)
-        Text(text = "Type: ${tagData.type}", color = Color.Black)
-        Text(text = "Writable: ${if (tagData.isWritable) "Yes" else "No"}", color = Color.Black)
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(text = "Tag Content", style = MaterialTheme.typography.titleMedium, color = Color.Black)
-        Divider(color = Color.LightGray, modifier = Modifier.padding(vertical = 8.dp))
-        Text(text = tagData.payload, color = Color.Black)
-        
-        Spacer(modifier = Modifier.height(32.dp))
-
-        // Webhook Assignment Section
-        Text(text = "Assign Webhook Event", style = MaterialTheme.typography.titleMedium, color = Color.Black)
-        Divider(color = Color.LightGray, modifier = Modifier.padding(vertical = 8.dp))
-        
-        Button(
-            onClick = { activity.launchQrScanner() },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Blue)
-        ) {
-            Text("Scan QR Code for URL", color = Color.White)
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        OutlinedTextField(
-            value = eventUrl,
-            onValueChange = { eventUrl = it },
-            label = { Text("Webhook URL") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color.Black,
-                unfocusedBorderColor = Color.Gray,
-                focusedLabelColor = Color.Black,
-            )
-        )
-        
-        Row(verticalAlignment = androidx.compose.ui.Alignment.CenterVertically) {
-            Text("GET", color = Color.Black)
-            Switch(
-                checked = isPost,
-                onCheckedChange = { isPost = it },
-                modifier = Modifier.padding(horizontal = 8.dp)
-            )
-            Text("POST", color = Color.Black)
-        }
-        
-        Button(
-            onClick = { 
-                if (tagData.tagId.isNotEmpty() && eventUrl.isNotEmpty()) {
-                    tagEventManager.saveEvent(tagData.tagId, eventUrl, isPost)
-                    serverResponse = "Event saved for Tag ID: ${tagData.tagId}"
-                } else {
-                    serverResponse = "Please scan a tag and enter a URL first."
-                }
-            },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.Gray)
-        ) {
-            Text("Save Event for Tag", color = Color.White)
-        }
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Text(text = "Server Response:", style = MaterialTheme.typography.titleSmall, color = Color.Black)
-        OutlinedTextField(
-            value = serverResponse,
-            onValueChange = {},
-            readOnly = true,
-            modifier = Modifier.fillMaxWidth().height(100.dp),
-            colors = OutlinedTextFieldDefaults.colors(
-                unfocusedBorderColor = Color.LightGray,
-                focusedBorderColor = Color.LightGray
-            )
-        )
-
-        Spacer(modifier = Modifier.height(32.dp))
-        
-        // Write Section
-        Text(text = "Write to Tag", style = MaterialTheme.typography.titleMedium, color = Color.Black)
-        Divider(color = Color.LightGray, modifier = Modifier.padding(vertical = 8.dp))
-        
-        OutlinedTextField(
-            value = textToWrite,
-            onValueChange = { textToWrite = it },
-            label = { Text("Text payload to write") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color.Black,
-                unfocusedBorderColor = Color.Gray,
-                focusedLabelColor = Color.Black,
-            )
-        )
-        
-        Spacer(modifier = Modifier.height(8.dp))
-        
-        OutlinedTextField(
-            value = passwordHex,
-            onValueChange = { passwordHex = it },
-            label = { Text("Password / Key (Hex)") },
-            modifier = Modifier.fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = Color.Black,
-                unfocusedBorderColor = Color.Gray,
-                focusedLabelColor = Color.Black,
-            )
-        )
-        
-        Spacer(modifier = Modifier.height(16.dp))
-        
-        Button(
-            onClick = { nfcManager.writeNdefMessage(textToWrite, passwordHex) },
-            modifier = Modifier.fillMaxWidth(),
-            colors = ButtonDefaults.buttonColors(containerColor = Color.DarkGray)
-        ) {
-            Text("Write to Tag", color = Color.White)
-        }
     }
 }
