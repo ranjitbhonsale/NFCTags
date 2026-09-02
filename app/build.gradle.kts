@@ -6,13 +6,13 @@ plugins {
 
 android {
     namespace = "work.ranjit.nfctags"
-    compileSdk = 36
+    compileSdk = 34
     defaultConfig {
         applicationId = "work.ranjit.nfctags"
         minSdk = 24
-        targetSdk = 35
-        versionCode = 2
-        versionName = "1.1"
+        targetSdk = 34
+        versionCode = 3
+        versionName = "1.2"
     }
 
     buildTypes {
