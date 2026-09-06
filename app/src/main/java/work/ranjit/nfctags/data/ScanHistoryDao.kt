@@ -8,11 +8,11 @@ import kotlinx.coroutines.flow.Flow
 @Dao
 interface ScanHistoryDao {
     @Insert
-    suspend fun insert(scanHistory: ScanHistoryEntity)
+    fun insert(scanHistory: ScanHistoryEntity)
 
     @Query("SELECT * FROM scan_history ORDER BY timestamp DESC")
     fun getAllHistory(): Flow<List<ScanHistoryEntity>>
 
     @Query("DELETE FROM scan_history")
-    suspend fun clearHistory()
+    fun clearHistory()
 }

@@ -41,7 +41,7 @@ fun HistoryScreen(historyDao: ScanHistoryDao) {
                 fontWeight = FontWeight.Bold
             )
             IconButton(onClick = {
-                coroutineScope.launch {
+                coroutineScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                     historyDao.clearHistory()
                 }
             }) {

@@ -82,7 +82,7 @@ class MainActivity : ComponentActivity() {
                         }
                         
                         // Save to history
-                        lifecycleScope.launch {
+                        lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                             database.scanHistoryDao().insert(
                                 ScanHistoryEntity(
                                     timestamp = System.currentTimeMillis(),
