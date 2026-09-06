@@ -70,10 +70,9 @@ fun WebhookScreen(
         
         Spacer(modifier = Modifier.height(8.dp))
         
-        Button(
+        OutlinedButton(
             onClick = onLaunchQrScanner,
-            modifier = Modifier.fillMaxWidth(),
-            variant = ButtonDefaults.outlinedButtonColors()
+            modifier = Modifier.fillMaxWidth()
         ) {
             Text("Scan QR Code for URL")
         }
@@ -120,7 +119,3 @@ fun WebhookScreen(
         }
     }
 }
-
-// Extension for outlined variant to avoid compilation issues if not present
-@Composable
-fun ButtonDefaults.outlinedButtonColors() = ButtonDefaults.outlinedButtonColors()
