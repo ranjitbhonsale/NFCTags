@@ -31,7 +31,6 @@ import work.ranjit.nfctags.ui.WebhookScreen
 
 class MainActivity : ComponentActivity() {
     private lateinit var nfcManager: NfcManager
-    private lateinit var tagEventManager: TagEventManager
     private lateinit var networkManager: NetworkManager
     private lateinit var database: AppDatabase
 
@@ -54,7 +53,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         nfcManager = NfcManager(this)
-        tagEventManager = TagEventManager(this)
         networkManager = NetworkManager()
         database = AppDatabase.getDatabase(this)
 
