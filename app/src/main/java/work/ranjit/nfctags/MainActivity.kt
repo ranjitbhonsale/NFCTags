@@ -65,17 +65,25 @@ class MainActivity : ComponentActivity() {
                 val tagData by nfcManager.tagData.collectAsState()
                 val statusMessage by nfcManager.statusMessage.collectAsState()
                 
-                // Webhook trigger logic
+                        // Webhook trigger logic
                 LaunchedEffect(tagData.tagId) {
                     if (tagData.tagId.isNotEmpty()) {
-                        val event = tagEventManager.getEvent(tagData.tagId)
                         var webhookRes = ""
-                        if (event != null) {
+                        val event = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                            database.automationDao().getAutomationByTagId(tagData.tagId)
+                        }
+                        
+                        if (event != null && event.isEnabled) {
+                            // Dynamic Variable Replacement
+                            var processedUrl = event.url
+                                .replace("{{tag_id}}", tagData.tagId)
+                                .replace("{{timestamp}}", System.currentTimeMillis().toString())
+                                
                             if (event.actionType == ActionType.OPEN_LINK) {
                                 try {
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(event.url))
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(processedUrl))
                                     startActivity(intent)
-                                    webhookRes = "Opened Link"
+                                    webhookRes = "Opened Link: $processedUrl"
                                 } catch (e: Exception) {
                                     webhookRes = "Failed to open link: ${e.message}"
                                 }
@@ -86,7 +94,7 @@ class MainActivity : ComponentActivity() {
                                     tagData.tagId
                                 }
                                 
-                                webhookRes = networkManager.sendNfcData(event.url, dataToSend, event.isPost)
+                                webhookRes = networkManager.sendNfcData(processedUrl, dataToSend, event.isPost)
                             }
                         }
                         // Save to history
@@ -116,6 +124,18 @@ class MainActivity : ComponentActivity() {
                                 selected = currentRoute == "scanner",
                                 onClick = {
                                     navController.navigate("scanner") {
+                                        popUpTo(navController.graph.startDestinationId) { saveState = true }
+                                        launchSingleTop = true
+                                        restoreState = true
+                                    }
+                                }
+                            )
+                            NavigationBarItem(
+                                icon = { Icon(androidx.compose.material.icons.Icons.Filled.List, contentDescription = "My Tags") },
+                                label = { Text("My Tags") },
+                                selected = currentRoute == "tags",
+                                onClick = {
+                                    navController.navigate("tags") {
                                         popUpTo(navController.graph.startDestinationId) { saveState = true }
                                         launchSingleTop = true
                                         restoreState = true
@@ -157,8 +177,11 @@ class MainActivity : ComponentActivity() {
                         composable("scanner") {
                             ScannerScreen(nfcManager, tagData, statusMessage)
                         }
+                        composable("tags") {
+                            work.ranjit.nfctags.ui.TagInventoryScreen(tagData, database.tagDao())
+                        }
                         composable("automations") {
-                            WebhookScreen(tagData, tagEventManager, qrScanResult) {
+                            WebhookScreen(tagData, database.automationDao(), qrScanResult) {
                                 launchQrScanner()
                             }
                         }

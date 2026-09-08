@@ -5,9 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [ScanHistoryEntity::class], version = 1, exportSchema = false)
+@Database(entities = [ScanHistoryEntity::class, NfcTagEntity::class, AutomationEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun scanHistoryDao(): ScanHistoryDao
+    abstract fun tagDao(): TagDao
+    abstract fun automationDao(): AutomationDao
 
     companion object {
         @Volatile
@@ -19,7 +21,9 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "nfc_database"
-                ).build()
+                )
+                .fallbackToDestructiveMigration() // Simple migration for version bump
+                .build()
                 INSTANCE = instance
                 instance
             }
