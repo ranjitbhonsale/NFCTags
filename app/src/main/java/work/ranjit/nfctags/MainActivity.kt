@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity() {
                                 .replace("{{tag_id}}", tagData.tagId)
                                 .replace("{{timestamp}}", System.currentTimeMillis().toString())
                                 
-                            if (event.actionType == ActionType.OPEN_LINK) {
+                            if (event.actionType == work.ranjit.nfctags.data.ActionType.OPEN_LINK) {
                                 try {
                                     val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(processedUrl))
                                     startActivity(intent)

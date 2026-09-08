@@ -16,7 +16,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
-import work.ranjit.nfctags.ActionType
+import work.ranjit.nfctags.data.ActionType
 import work.ranjit.nfctags.NfcTagData
 import work.ranjit.nfctags.data.AutomationDao
 import work.ranjit.nfctags.data.AutomationEntity

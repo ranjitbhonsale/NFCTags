@@ -2,7 +2,10 @@ package work.ranjit.nfctags.data
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
-import work.ranjit.nfctags.ActionType
+
+enum class ActionType {
+    WEBHOOK, OPEN_LINK
+}
 
 @Entity(tableName = "automations")
 data class AutomationEntity(
