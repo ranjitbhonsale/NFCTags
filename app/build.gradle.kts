@@ -12,8 +12,8 @@ android {
         applicationId = "work.ranjit.nfctags"
         minSdk = 24
         targetSdk = 36
-        versionCode = 8
-        versionName = "1.7"
+        versionCode = 9
+        versionName = "1.8"
     }
 
     buildTypes {
@@ -88,6 +88,8 @@ dependencies {
   // Networking and QR Scanning
   implementation("com.squareup.okhttp3:okhttp:4.12.0")
   implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+  // JSON Serialization
+  implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
 
   // Room Database for Scan History
   val room_version = "2.6.1"

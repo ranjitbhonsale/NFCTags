@@ -25,14 +25,44 @@ import java.util.Locale
 @Composable
 fun TagInventoryScreen(
     tagData: NfcTagData,
-    tagDao: TagDao
+    tagDao: TagDao,
+    backupManager: work.ranjit.nfctags.BackupManager
 ) {
     val coroutineScope = rememberCoroutineScope()
     val tags by tagDao.getAllTags().collectAsState(initial = emptyList())
     
     var showAddDialog by remember { mutableStateOf(false) }
     var newTagName by remember { mutableStateOf("") }
-    
+    val context = androidx.compose.ui.platform.LocalContext.current
+    var backupMessage by remember { mutableStateOf("") }
+
+    val exportLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.CreateDocument("application/json")
+    ) { uri ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val result = backupManager.exportBackup(uri)
+                backupMessage = if (result.isSuccess) "Exported successfully!" else "Export failed: ${result.exceptionOrNull()?.message}"
+            }
+        }
+    }
+
+    val importLauncher = androidx.activity.compose.rememberLauncherForActivityResult(
+        androidx.activity.result.contract.ActivityResultContracts.OpenDocument()
+    ) { uri ->
+        if (uri != null) {
+            coroutineScope.launch {
+                val result = backupManager.importBackup(uri)
+                backupMessage = if (result.isSuccess) {
+                    val (t, a) = result.getOrNull()!!
+                    "Imported $t tags and $a automations!"
+                } else {
+                    "Import failed: ${result.exceptionOrNull()?.message}"
+                }
+            }
+        }
+    }
+
     // Auto-prompt to add tag if a new tag is scanned that isn't in DB
     LaunchedEffect(tagData.tagId) {
         if (tagData.tagId.isNotEmpty()) {
@@ -103,8 +133,22 @@ fun TagInventoryScreen(
             style = MaterialTheme.typography.bodyMedium,
             color = Color.Gray
         )
+
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
+            OutlinedButton(onClick = { exportLauncher.launch("NfcTagsBackup.json") }) {
+                Text("Export Backup")
+            }
+            OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
+                Text("Import Backup")
+            }
+        }
+
+        if (backupMessage.isNotEmpty()) {
+            Text(text = backupMessage, color = MaterialTheme.colorScheme.primary, style = MaterialTheme.typography.bodySmall)
+            Spacer(modifier = Modifier.height(8.dp))
+        }
         
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(8.dp))
         
         if (tags.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {

@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
     private lateinit var nfcManager: NfcManager
     private lateinit var networkManager: NetworkManager
     private lateinit var database: AppDatabase
+    private lateinit var backupManager: BackupManager
 
     private var qrScanResult by mutableStateOf("")
 
@@ -55,6 +56,7 @@ class MainActivity : ComponentActivity() {
         nfcManager = NfcManager(this)
         networkManager = NetworkManager()
         database = AppDatabase.getDatabase(this)
+        backupManager = BackupManager(this, database)
 
         enableEdgeToEdge()
         setContent {
@@ -176,7 +178,7 @@ class MainActivity : ComponentActivity() {
                             ScannerScreen(nfcManager, tagData, statusMessage)
                         }
                         composable("tags") {
-                            work.ranjit.nfctags.ui.TagInventoryScreen(tagData, database.tagDao())
+                            work.ranjit.nfctags.ui.TagInventoryScreen(tagData, database.tagDao(), backupManager)
                         }
                         composable("automations") {
                             WebhookScreen(tagData, database.automationDao(), qrScanResult) {
