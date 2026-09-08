@@ -208,10 +208,34 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         nfcManager.enableReaderMode()
+        intent?.let { processNfcIntent(it) }
     }
 
     override fun onPause() {
         super.onPause()
         nfcManager.disableReaderMode()
+    }
+
+    override fun onNewIntent(intent: android.content.Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        processNfcIntent(intent)
+    }
+
+    private fun processNfcIntent(intent: android.content.Intent) {
+        val action = intent.action
+        if (android.nfc.NfcAdapter.ACTION_NDEF_DISCOVERED == action ||
+            android.nfc.NfcAdapter.ACTION_TECH_DISCOVERED == action ||
+            android.nfc.NfcAdapter.ACTION_TAG_DISCOVERED == action) {
+            val tag: android.nfc.Tag? = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(android.nfc.NfcAdapter.EXTRA_TAG, android.nfc.Tag::class.java)
+            } else {
+                @Suppress("DEPRECATION")
+                intent.getParcelableExtra(android.nfc.NfcAdapter.EXTRA_TAG)
+            }
+            if (tag != null) {
+                nfcManager.onTagDiscovered(tag)
+            }
+        }
     }
 }
