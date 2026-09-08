@@ -19,20 +19,20 @@
             android:exported="true">
             <!-- NDEF text and wildcard data -->
             <intent-filter>
-                <action android:name="android.intent.action.NDEF_DISCOVERED" />
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="*/*" />
             </intent-filter>
             <!-- NDEF HTTP/HTTPS web links -->
             <intent-filter>
-                <action android:name="android.intent.action.NDEF_DISCOVERED" />
+                <action android:name="android.nfc.action.NDEF_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:scheme="http" />
                 <data android:scheme="https" />
             </intent-filter>
             <!-- TECH discovered (Mifare, ISO, NFC-A/B/F/V, Formatable, etc.) -->
             <intent-filter>
-                <action android:name="android.intent.action.TECH_DISCOVERED" />
+                <action android:name="android.nfc.action.TECH_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <meta-data
@@ -40,7 +40,7 @@
                 android:resource="@xml/nfc_tech_filter" />
             <!-- General Tag Discovered Fallback -->
             <intent-filter>
-                <action android:name="android.intent.action.TAG_DISCOVERED" />
+                <action android:name="android.nfc.action.TAG_DISCOVERED" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
             <intent-filter>
