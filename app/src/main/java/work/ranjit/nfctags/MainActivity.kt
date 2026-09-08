@@ -70,17 +70,25 @@ class MainActivity : ComponentActivity() {
                     if (tagData.tagId.isNotEmpty()) {
                         val event = tagEventManager.getEvent(tagData.tagId)
                         var webhookRes = ""
-                        
                         if (event != null) {
-                            val dataToSend = if (tagData.payload.isNotEmpty() && tagData.payload != "Empty tag" && !tagData.payload.startsWith("Mifare Classic")) {
-                                tagData.payload
+                            if (event.actionType == ActionType.OPEN_LINK) {
+                                try {
+                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(event.url))
+                                    startActivity(intent)
+                                    webhookRes = "Opened Link"
+                                } catch (e: Exception) {
+                                    webhookRes = "Failed to open link: ${e.message}"
+                                }
                             } else {
-                                tagData.tagId
+                                val dataToSend = if (tagData.payload.isNotEmpty() && tagData.payload != "Empty tag" && !tagData.payload.startsWith("Mifare Classic")) {
+                                    tagData.payload
+                                } else {
+                                    tagData.tagId
+                                }
+                                
+                                webhookRes = networkManager.sendNfcData(event.url, dataToSend, event.isPost)
                             }
-                            
-                            webhookRes = networkManager.sendNfcData(event.url, dataToSend, event.isPost)
                         }
-                        
                         // Save to history
                         lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                             database.scanHistoryDao().insert(

@@ -79,18 +79,45 @@ fun WebhookScreen(
         
         Spacer(modifier = Modifier.height(16.dp))
         
+        var actionType by remember { mutableStateOf(work.ranjit.nfctags.ActionType.WEBHOOK) }
+
+        Text("Action Type", fontWeight = FontWeight.Bold)
         Row(
-            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
-            modifier = Modifier.fillMaxWidth()
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
         ) {
-            Text("Method:", modifier = Modifier.weight(1f))
-            Text("GET", fontWeight = if (!isPost) FontWeight.Bold else FontWeight.Normal)
-            Switch(
-                checked = isPost,
-                onCheckedChange = { isPost = it },
-                modifier = Modifier.padding(horizontal = 8.dp)
+            RadioButton(
+                selected = actionType == work.ranjit.nfctags.ActionType.WEBHOOK,
+                onClick = { actionType = work.ranjit.nfctags.ActionType.WEBHOOK }
             )
-            Text("POST", fontWeight = if (isPost) FontWeight.Bold else FontWeight.Normal)
+            Text("Send Webhook (Background)")
+        }
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = androidx.compose.ui.Alignment.CenterVertically
+        ) {
+            RadioButton(
+                selected = actionType == work.ranjit.nfctags.ActionType.OPEN_LINK,
+                onClick = { actionType = work.ranjit.nfctags.ActionType.OPEN_LINK }
+            )
+            Text("Open Link / Deep Link (Browser)")
+        }
+
+        if (actionType == work.ranjit.nfctags.ActionType.WEBHOOK) {
+            Spacer(modifier = Modifier.height(16.dp))
+            Row(
+                verticalAlignment = androidx.compose.ui.Alignment.CenterVertically,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Webhook Method:", modifier = Modifier.weight(1f))
+                Text("GET", fontWeight = if (!isPost) FontWeight.Bold else FontWeight.Normal)
+                Switch(
+                    checked = isPost,
+                    onCheckedChange = { isPost = it },
+                    modifier = Modifier.padding(horizontal = 8.dp)
+                )
+                Text("POST", fontWeight = if (isPost) FontWeight.Bold else FontWeight.Normal)
+            }
         }
         
         Spacer(modifier = Modifier.height(24.dp))
@@ -98,7 +125,7 @@ fun WebhookScreen(
         Button(
             onClick = { 
                 if (tagData.tagId.isNotEmpty() && eventUrl.isNotEmpty()) {
-                    tagEventManager.saveEvent(tagData.tagId, eventUrl, isPost)
+                    tagEventManager.saveEvent(tagData.tagId, eventUrl, isPost, actionType)
                     message = "Successfully linked URL to Tag: ${tagData.tagId}"
                 } else {
                     message = "Please scan a tag and enter a URL first."
