@@ -21,6 +21,9 @@ import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import work.ranjit.nfctags.data.ActionType
+import android.content.Intent
+import android.content.pm.ResolveInfo
+import androidx.compose.ui.platform.LocalContext
 import work.ranjit.nfctags.NfcTagData
 import work.ranjit.nfctags.data.AutomationDao
 import work.ranjit.nfctags.data.AutomationEntity
@@ -44,6 +47,7 @@ fun WebhookScreen(
     
     // Editor State
     var selectedTagId by remember { mutableStateOf("") }
+    var selectedAppPackage by remember { mutableStateOf("") }
     var eventUrl by remember(scannedQrUrl) { mutableStateOf(scannedQrUrl) }
     var isPost by remember { mutableStateOf(false) }
     var actionType by remember { mutableStateOf(ActionType.WEBHOOK) }
@@ -237,6 +241,16 @@ fun WebhookScreen(
                     )
                     Text("Open Link / Deep Link (Browser)")
                 }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = actionType == ActionType.OPEN_APP,
+                        onClick = { actionType = ActionType.OPEN_APP }
+                    )
+                    Text("Open App (Launch)")
+                }
 
                 if (actionType == ActionType.WEBHOOK) {
                     Spacer(modifier = Modifier.height(16.dp))
@@ -253,6 +267,52 @@ fun WebhookScreen(
                         )
                         Text("POST", fontWeight = if (isPost) FontWeight.Bold else FontWeight.Normal)
                     }
+                }
+
+                if (actionType == ActionType.OPEN_APP) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    val context = LocalContext.current
+                    var apps by remember { mutableStateOf(listOf<ResolveInfo>()) }
+                    LaunchedEffect(Unit) {
+                        val intent = Intent(Intent.ACTION_MAIN)
+                        intent.addCategory(Intent.CATEGORY_LAUNCHER)
+                        apps = context.packageManager.queryIntentActivities(intent, 0)
+                    }
+                    var appDropdownExpanded by remember { mutableStateOf(false) }
+                    ExposedDropdownMenuBox(
+                        expanded = appDropdownExpanded,
+                        onExpandedChange = { appDropdownExpanded = it }
+                    ) {
+                        OutlinedTextField(
+                            value = selectedAppPackage.ifEmpty { "Select app" },
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("App to launch") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = appDropdownExpanded) },
+                            modifier = Modifier.fillMaxWidth().menuAnchor()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = appDropdownExpanded,
+                            onDismissRequest = { appDropdownExpanded = false }
+                        ) {
+                            apps.forEach { info ->
+                                val pkg = info.activityInfo.packageName
+                                val label = info.loadLabel(context.packageManager).toString()
+                                DropdownMenuItem(
+                                    text = { Text("$label ($pkg)") },
+                                    onClick = {
+                                        selectedAppPackage = pkg
+                                        appDropdownExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                val saveEnabled = when (actionType) {
+                    ActionType.OPEN_APP -> selectedTagId.isNotEmpty() && selectedAppPackage.isNotEmpty()
+                    else -> selectedTagId.isNotEmpty() && eventUrl.isNotEmpty()
                 }
                 
                 Spacer(modifier = Modifier.height(24.dp))
@@ -276,12 +336,13 @@ fun WebhookScreen(
                     
                     Button(
                         onClick = { 
-                            if (selectedTagId.isNotEmpty() && eventUrl.isNotEmpty()) {
+                            if (selectedTagId.isNotEmpty()) {
                                 coroutineScope.launch(Dispatchers.IO) {
                                     val newAutomation = AutomationEntity(
                                         id = editingAutomation?.id ?: 0,
                                         tagId = selectedTagId,
                                         actionType = actionType,
+                                        appPackage = if (actionType == ActionType.OPEN_APP) selectedAppPackage else null,
                                         url = eventUrl,
                                         isPost = isPost,
                                         isEnabled = true
@@ -295,7 +356,7 @@ fun WebhookScreen(
                                 showEditor = false
                             }
                         },
-                        enabled = selectedTagId.isNotEmpty() && eventUrl.isNotEmpty()
+                        enabled = saveEnabled
                     ) {
                         Text("Save")
                     }

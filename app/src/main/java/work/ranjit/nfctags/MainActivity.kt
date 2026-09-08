@@ -79,22 +79,33 @@ class MainActivity : ComponentActivity() {
                                 .replace("{{tag_id}}", tagData.tagId)
                                 .replace("{{timestamp}}", System.currentTimeMillis().toString())
                                 
-                            if (event.actionType == work.ranjit.nfctags.data.ActionType.OPEN_LINK) {
-                                try {
-                                    val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(processedUrl))
-                                    startActivity(intent)
-                                    webhookRes = "Opened Link: $processedUrl"
-                                } catch (e: Exception) {
-                                    webhookRes = "Failed to open link: ${e.message}"
+                            when (event.actionType) {
+                                work.ranjit.nfctags.data.ActionType.OPEN_LINK -> {
+                                    try {
+                                        val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(processedUrl))
+                                        startActivity(intent)
+                                        webhookRes = "Opened Link: $processedUrl"
+                                    } catch (e: Exception) {
+                                        webhookRes = "Failed to open link: ${e.message}"
+                                    }
                                 }
-                            } else {
-                                val dataToSend = if (tagData.payload.isNotEmpty() && tagData.payload != "Empty tag" && !tagData.payload.startsWith("Mifare Classic")) {
-                                    tagData.payload
-                                } else {
-                                    tagData.tagId
+                                work.ranjit.nfctags.data.ActionType.OPEN_APP -> {
+                                    val launchIntent = packageManager.getLaunchIntentForPackage(event.appPackage ?: "")
+                                    if (launchIntent != null) {
+                                        startActivity(launchIntent)
+                                        webhookRes = "Launched app: ${event.appPackage}"
+                                    } else {
+                                        webhookRes = "Failed to launch app: ${event.appPackage}"
+                                    }
                                 }
-                                
-                                webhookRes = networkManager.sendNfcData(processedUrl, dataToSend, event.isPost)
+                                else -> {
+                                    val dataToSend = if (tagData.payload.isNotEmpty() && tagData.payload != "Empty tag" && !tagData.payload.startsWith("Mifare Classic")) {
+                                        tagData.payload
+                                    } else {
+                                        tagData.tagId
+                                    }
+                                    webhookRes = networkManager.sendNfcData(processedUrl, dataToSend, event.isPost)
+                                }
                             }
                         }
                         // Save to history
