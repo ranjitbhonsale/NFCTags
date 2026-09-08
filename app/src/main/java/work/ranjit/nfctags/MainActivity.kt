@@ -181,7 +181,7 @@ class MainActivity : ComponentActivity() {
                             work.ranjit.nfctags.ui.TagInventoryScreen(tagData, database.tagDao(), backupManager)
                         }
                         composable("automations") {
-                            WebhookScreen(tagData, database.automationDao(), qrScanResult) {
+                            work.ranjit.nfctags.ui.WebhookScreen(tagData, database.automationDao(), database.tagDao(), qrScanResult) {
                                 launchQrScanner()
                             }
                         }
