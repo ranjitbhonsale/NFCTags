@@ -32,6 +32,15 @@ jobs:
           KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: ./gradlew bundleRelease -Pandroid.injected.signing.store.file=${{ github.workspace }}/keystore.jks -Pandroid.injected.signing.store.password=$KEYSTORE_PASSWORD -Pandroid.injected.signing.key.alias=$KEY_ALIAS -Pandroid.injected.signing.key.password=$KEY_PASSWORD
 
+      - name: Save Release AABs as Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-bundles
+          path: |
+            app/build/outputs/bundle/release/app-release.aab
+            wear/build/outputs/bundle/release/wear-release.aab
+          retention-days: 7
+
       - name: Upload to Google Play
         uses: r0adkll/upload-google-play@v1
         with:
@@ -40,3 +49,4 @@ jobs:
           releaseFiles: '*/build/outputs/bundle/release/*.aab'
           track: internal
           status: completed
+          changesNotSentForReview: true
