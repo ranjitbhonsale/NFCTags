@@ -26,7 +26,8 @@ import java.util.Locale
 fun TagInventoryScreen(
     tagData: NfcTagData,
     tagDao: TagDao,
-    backupManager: work.ranjit.nfctags.BackupManager
+    backupManager: work.ranjit.nfctags.BackupManager,
+    database: work.ranjit.nfctags.data.AppDatabase
 ) {
     val coroutineScope = rememberCoroutineScope()
     val tags by tagDao.getAllTags().collectAsState(initial = emptyList())
@@ -134,12 +135,29 @@ fun TagInventoryScreen(
             color = Color.Gray
         )
 
-        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.SpaceBetween) {
-            OutlinedButton(onClick = { exportLauncher.launch("NfcTagsBackup.json") }) {
-                Text("Export Backup")
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            OutlinedButton(
+                onClick = { exportLauncher.launch("NfcTagsBackup.json") },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Export")
             }
-            OutlinedButton(onClick = { importLauncher.launch(arrayOf("application/json")) }) {
-                Text("Import Backup")
+            OutlinedButton(
+                onClick = { importLauncher.launch(arrayOf("application/json")) },
+                modifier = Modifier.weight(1f)
+            ) {
+                Text("Import")
+            }
+            Button(
+                onClick = {
+                    coroutineScope.launch {
+                        val ok = work.ranjit.nfctags.wear.WearDataSyncManager.syncTagsToWatch(context, database)
+                        backupMessage = if (ok) "Synced to Watch successfully!" else "Failed to sync to Watch"
+                    }
+                },
+                modifier = Modifier.weight(1.2f)
+            ) {
+                Text("⌚ Sync Watch")
             }
         }
 

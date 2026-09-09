@@ -17,6 +17,9 @@ interface AutomationDao {
     @Query("SELECT * FROM automations ORDER BY id DESC")
     fun getAllAutomations(): Flow<List<AutomationEntity>>
 
+    @Query("SELECT * FROM automations ORDER BY id DESC")
+    fun getAllAutomationsSync(): List<AutomationEntity>
+
     @Query("SELECT * FROM automations WHERE tagId = :tagId AND isEnabled = 1")
     fun getActiveAutomationsForTag(tagId: String): List<AutomationEntity>
     

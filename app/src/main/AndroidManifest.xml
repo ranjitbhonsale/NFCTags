@@ -48,6 +48,16 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <!-- Service to receive automation trigger messages from Wear OS companion watch -->
+        <service
+            android:name=".wear.PhoneWearMessageListenerService"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/trigger_automation" />
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>

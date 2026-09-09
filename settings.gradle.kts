@@ -31,3 +31,4 @@ plugins {
 
 rootProject.name = "NFC Reader Writer"
 include(":app")
+include(":wear")

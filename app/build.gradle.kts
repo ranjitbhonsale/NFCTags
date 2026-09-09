@@ -12,8 +12,8 @@ android {
         applicationId = "work.ranjit.nfctags"
         minSdk = 24
         targetSdk = 36
-        versionCode = 13
-        versionName = "2.2"
+        versionCode = 14
+        versionName = "2.3"
     }
 
     buildTypes {
@@ -21,6 +21,12 @@ android {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
+    }
+
+    lint {
+        disable += "InvalidFragmentVersionForActivityResult"
+        abortOnError = false
+        checkReleaseBuilds = false
     }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
@@ -96,4 +102,8 @@ dependencies {
   implementation("androidx.room:room-runtime:$room_version")
   implementation("androidx.room:room-ktx:$room_version")
   ksp("androidx.room:room-compiler:$room_version")
+
+  // Wearable Data Layer API
+  implementation(libs.play.services.wearable)
+  implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.2")
 }

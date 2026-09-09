@@ -1,0 +1,6 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">NFC Wear</string>
+    <string name="hce_service_name">NFC Tag Emulation Service</string>
+    <string name="ndef_aid_desc">NFC Forum Type 4 NDEF Tag Emulation</string>
+</resources>
