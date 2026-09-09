@@ -29,10 +29,28 @@ class WearMainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        WearTagRepository.init(this)
+        try {
+            WearTagRepository.init(this)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
 
         setContent {
-            WearNfcApp()
+            MaterialTheme(
+                colors = Colors(
+                    primary = Color(0xFF00B4D8),
+                    primaryVariant = Color(0xFF0077B6),
+                    secondary = Color(0xFF48CAE4),
+                    background = Color.Black,
+                    surface = Color(0xFF1E1E1E),
+                    onPrimary = Color.White,
+                    onSecondary = Color.Black,
+                    onBackground = Color.White,
+                    onSurface = Color.White
+                )
+            ) {
+                WearNfcApp()
+            }
         }
     }
 }
