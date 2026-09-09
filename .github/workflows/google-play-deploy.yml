@@ -37,8 +37,6 @@ jobs:
         with:
           serviceAccountJsonPlainText: ${{ secrets.PLAY_STORE_JSON_KEY }}
           packageName: work.ranjit.nfctags
-          releaseFiles: |
-            app/build/outputs/bundle/release/app-release.aab
-            wear/build/outputs/bundle/release/wear-release.aab
+          releaseFiles: '*/build/outputs/bundle/release/*.aab'
           track: internal
           status: completed
