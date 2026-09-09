@@ -12,7 +12,7 @@ android {
         applicationId = "work.ranjit.nfctags"
         minSdk = 30
         targetSdk = 36
-        versionCode = 14
+        versionCode = 2014
         versionName = "2.3"
     }
 
