@@ -13,3 +13,6 @@ build/
 .externalNativeBuild
 .cxx
 local.properties
+signed_bundles/
+wear/screenshots/
+implementation_plan_*.md

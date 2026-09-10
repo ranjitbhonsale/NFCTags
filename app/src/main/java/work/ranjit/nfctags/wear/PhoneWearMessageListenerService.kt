@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import work.ranjit.nfctags.NetworkManager
 import work.ranjit.nfctags.data.ActionType
 import work.ranjit.nfctags.data.AppDatabase
+import work.ranjit.nfctags.SmsSender
 import work.ranjit.nfctags.data.ScanHistoryEntity
 
 class PhoneWearMessageListenerService : WearableListenerService() {
@@ -19,6 +20,7 @@ class PhoneWearMessageListenerService : WearableListenerService() {
     companion object {
         private const val TAG = "PhoneWearListener"
         const val PATH_TRIGGER_AUTOMATION = "/trigger_automation"
+        const val PATH_REQUEST_SYNC = "/request_sync"
     }
 
     private val serviceScope = CoroutineScope(Dispatchers.IO)
@@ -28,6 +30,12 @@ class PhoneWearMessageListenerService : WearableListenerService() {
             val tagId = String(messageEvent.data, Charsets.UTF_8)
             Log.d(TAG, "Received trigger automation request from watch for tagId: $tagId")
             triggerAutomationForTag(tagId)
+        } else if (messageEvent.path == PATH_REQUEST_SYNC) {
+            Log.d(TAG, "Received /request_sync from watch. Pushing tags...")
+            serviceScope.launch {
+                val database = AppDatabase.getDatabase(applicationContext)
+                WearDataSyncManager.syncTagsToWatch(applicationContext, database)
+            }
         }
     }
 
@@ -67,6 +75,16 @@ class PhoneWearMessageListenerService : WearableListenerService() {
                         } else {
                             resultStr = "Failed to launch $pkg"
                         }
+                    }
+                    ActionType.SEND_SMS -> {
+                        val processedMessage = (event.smsMessage ?: "")
+                            .replace("{{tag_id}}", tagId)
+                            .replace("{{timestamp}}", System.currentTimeMillis().toString())
+                        resultStr = SmsSender.sendSms(
+                            applicationContext,
+                            event.smsPhoneNumbers,
+                            processedMessage
+                        )
                     }
                     ActionType.WEBHOOK -> {
                         val dataToSend = tagEntity?.name?.ifEmpty { tagId } ?: tagId

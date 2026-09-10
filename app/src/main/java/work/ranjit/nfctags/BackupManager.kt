@@ -22,11 +22,14 @@ class BackupManager(private val context: Context, private val database: AppDatab
                 tags = tags.map { SerializableNfcTag(it.tagId, it.name, it.dateAdded) },
                 automations = automations.map { 
                     SerializableAutomation(
-                        it.tagId, 
-                        it.actionType.name, 
-                        it.url, 
-                        it.isPost, 
-                        it.isEnabled
+                        tagId = it.tagId, 
+                        actionType = it.actionType.name, 
+                        url = it.url, 
+                        isPost = it.isPost, 
+                        isEnabled = it.isEnabled,
+                        appPackage = it.appPackage,
+                        smsPhoneNumbers = it.smsPhoneNumbers,
+                        smsMessage = it.smsMessage
                     ) 
                 }
             )
@@ -81,7 +84,10 @@ class BackupManager(private val context: Context, private val database: AppDatab
                             actionType = actionType,
                             url = auto.url,
                             isPost = auto.isPost,
-                            isEnabled = auto.isEnabled
+                            isEnabled = auto.isEnabled,
+                            appPackage = auto.appPackage,
+                            smsPhoneNumbers = auto.smsPhoneNumbers,
+                            smsMessage = auto.smsMessage
                         )
                     )
                 } else {
@@ -91,7 +97,10 @@ class BackupManager(private val context: Context, private val database: AppDatab
                             actionType = actionType,
                             url = auto.url,
                             isPost = auto.isPost,
-                            isEnabled = auto.isEnabled
+                            isEnabled = auto.isEnabled,
+                            appPackage = auto.appPackage,
+                            smsPhoneNumbers = auto.smsPhoneNumbers,
+                            smsMessage = auto.smsMessage
                         )
                     )
                 }

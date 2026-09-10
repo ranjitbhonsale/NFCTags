@@ -4,6 +4,7 @@
     <uses-feature android:name="android.hardware.nfc" android:required="true" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.SEND_SMS" />
 
     <application
         android:allowBackup="true"
@@ -49,13 +50,14 @@
             </intent-filter>
         </activity>
 
-        <!-- Service to receive automation trigger messages from Wear OS companion watch -->
+        <!-- Service to receive automation trigger & sync messages from Wear OS companion watch -->
         <service
             android:name=".wear.PhoneWearMessageListenerService"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.MESSAGE_RECEIVED" />
                 <data android:scheme="wear" android:host="*" android:pathPrefix="/trigger_automation" />
+                <data android:scheme="wear" android:host="*" android:pathPrefix="/request_sync" />
             </intent-filter>
         </service>
     </application>

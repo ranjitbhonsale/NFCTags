@@ -98,6 +98,16 @@ class MainActivity : ComponentActivity() {
                                         webhookRes = "Failed to launch app: ${event.appPackage}"
                                     }
                                 }
+                                work.ranjit.nfctags.data.ActionType.SEND_SMS -> {
+                                    val processedMessage = (event.smsMessage ?: "")
+                                        .replace("{{tag_id}}", tagData.tagId)
+                                        .replace("{{timestamp}}", System.currentTimeMillis().toString())
+                                    webhookRes = SmsSender.sendSms(
+                                        this@MainActivity,
+                                        event.smsPhoneNumbers,
+                                        processedMessage
+                                    )
+                                }
                                 else -> {
                                     val dataToSend = if (tagData.payload.isNotEmpty() && tagData.payload != "Empty tag" && !tagData.payload.startsWith("Mifare Classic")) {
                                         tagData.payload

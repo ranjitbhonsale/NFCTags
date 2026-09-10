@@ -20,7 +20,10 @@ data class SerializableNfcTag(
 data class SerializableAutomation(
     val tagId: String,
     val actionType: String,
-    val url: String,
-    val isPost: Boolean,
-    val isEnabled: Boolean
+    val url: String = "",
+    val isPost: Boolean = false,
+    val isEnabled: Boolean = true,
+    val appPackage: String? = null,
+    val smsPhoneNumbers: String? = null,
+    val smsMessage: String? = null
 )
