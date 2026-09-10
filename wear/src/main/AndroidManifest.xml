@@ -19,7 +19,7 @@
             android:value="true" />
 
         <activity
-            android:name=".wear.WearMainActivity"
+            android:name="work.ranjit.nfctags.wear.WearMainActivity"
             android:exported="true"
             android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
             <intent-filter>
@@ -30,7 +30,7 @@
 
         <!-- NFC Host Card Emulation Service for Type 4 NDEF -->
         <service
-            android:name=".wear.NfcCardEmulationService"
+            android:name="work.ranjit.nfctags.wear.NfcCardEmulationService"
             android:exported="true"
             android:permission="android.permission.BIND_NFC_SERVICE">
             <intent-filter>
@@ -44,7 +44,7 @@
 
         <!-- Wearable Listener Service to receive tags from phone in background -->
         <service
-            android:name=".wear.WearTagListenerService"
+            android:name="work.ranjit.nfctags.wear.WearTagListenerService"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.android.gms.wearable.DATA_CHANGED" />
