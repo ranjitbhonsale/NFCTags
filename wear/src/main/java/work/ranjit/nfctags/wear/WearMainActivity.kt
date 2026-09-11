@@ -164,39 +164,53 @@ fun WearNfcApp() {
 
                 items(tags) { tag ->
                     val isSelected = tag.tagId == activeTag?.tagId
-                    ToggleChip(
-                        checked = isSelected,
-                        onCheckedChange = {
-                            WearTagRepository.setActiveTag(context, tag)
-                            Toast.makeText(context, "Emulating: ${tag.name}", Toast.LENGTH_SHORT).show()
-                        },
-                        label = {
-                            Text(
-                                text = tag.name,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
-                            )
-                        },
-                        secondaryLabel = {
-                            Text(
-                                text = tag.tagId,
-                                fontSize = 10.sp
-                            )
-                        },
-                        toggleControl = {
-                            RadioButton(selected = isSelected)
-                        },
-                        modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp)
-                    )
-
-                    if (tag.automationUrl != null || tag.actionType != null) {
-                        CompactChip(
-                            onClick = { triggerAutomationOnPhone(tag) },
-                            label = { Text("⚡ Run Action on Phone", fontSize = 10.sp) },
-                            colors = ChipDefaults.secondaryChipColors(),
-                            modifier = Modifier.padding(bottom = 6.dp)
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        ToggleChip(
+                            checked = isSelected,
+                            onCheckedChange = {
+                                WearTagRepository.setActiveTag(context, tag)
+                                Toast.makeText(context, "Emulating: ${tag.name}", Toast.LENGTH_SHORT).show()
+                            },
+                            label = {
+                                Text(
+                                    text = tag.name,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                )
+                            },
+                            secondaryLabel = {
+                                Text(
+                                    text = tag.tagId,
+                                    fontSize = 10.sp,
+                                    color = Color.LightGray
+                                )
+                            },
+                            toggleControl = {
+                                RadioButton(selected = isSelected)
+                            },
+                            modifier = Modifier.fillMaxWidth()
                         )
+
+                        if (tag.automationUrl != null || tag.actionType != null) {
+                            Spacer(modifier = Modifier.height(4.dp))
+                            val actionTitle = when (tag.actionType) {
+                                "SEND_SMS" -> "⚡ Send SMS from Phone"
+                                "OPEN_APP" -> "⚡ Launch App on Phone"
+                                else -> "⚡ Run Action on Phone"
+                            }
+                            CompactChip(
+                                onClick = { triggerAutomationOnPhone(tag) },
+                                label = { Text(actionTitle, fontSize = 10.sp) },
+                                colors = ChipDefaults.secondaryChipColors(),
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
                     }
                 }
             }
