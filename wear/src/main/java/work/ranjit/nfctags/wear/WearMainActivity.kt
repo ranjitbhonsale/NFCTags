@@ -133,11 +133,6 @@ fun WearNfcApp() {
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
-                        Text(
-                            text = activeTag?.let { "ID: ${it.tagId}" } ?: "Sync tags from phone",
-                            fontSize = 10.sp,
-                            color = Color.LightGray
-                        )
                     }
                 }
             }
@@ -167,48 +162,48 @@ fun WearNfcApp() {
                     Column(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(vertical = 4.dp),
+                            .padding(vertical = 3.dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        ToggleChip(
-                            checked = isSelected,
-                            onCheckedChange = {
+                        Chip(
+                            onClick = {
                                 WearTagRepository.setActiveTag(context, tag)
                                 Toast.makeText(context, "Emulating: ${tag.name}", Toast.LENGTH_SHORT).show()
                             },
                             label = {
                                 Text(
-                                    text = tag.name,
+                                    text = if (isSelected) "🟢  ${tag.name}" else tag.name,
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
-                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal
+                                    fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
+                                    fontSize = 13.sp
                                 )
                             },
-                            secondaryLabel = {
-                                Text(
-                                    text = tag.tagId,
-                                    fontSize = 10.sp,
-                                    color = Color.LightGray
+                            colors = if (isSelected) {
+                                ChipDefaults.primaryChipColors(
+                                    backgroundColor = Color(0xFF1B3B4B),
+                                    contentColor = Color.White
                                 )
-                            },
-                            toggleControl = {
-                                RadioButton(selected = isSelected)
+                            } else {
+                                ChipDefaults.secondaryChipColors()
                             },
                             modifier = Modifier.fillMaxWidth()
                         )
 
                         if (tag.automationUrl != null || tag.actionType != null) {
-                            Spacer(modifier = Modifier.height(4.dp))
+                            Spacer(modifier = Modifier.height(2.dp))
                             val actionTitle = when (tag.actionType) {
-                                "SEND_SMS" -> "⚡ Send SMS from Phone"
-                                "OPEN_APP" -> "⚡ Launch App on Phone"
-                                else -> "⚡ Run Action on Phone"
+                                "SEND_SMS" -> "⚡ Send SMS"
+                                "OPEN_APP" -> "⚡ Launch App"
+                                "OPEN_LINK" -> "⚡ Open Link"
+                                "WEBHOOK" -> "⚡ Send Webhook"
+                                else -> "⚡ Run Action"
                             }
                             CompactChip(
                                 onClick = { triggerAutomationOnPhone(tag) },
-                                label = { Text(actionTitle, fontSize = 10.sp) },
+                                label = { Text(actionTitle, fontSize = 11.sp) },
                                 colors = ChipDefaults.secondaryChipColors(),
-                                modifier = Modifier.padding(bottom = 4.dp)
+                                modifier = Modifier.padding(bottom = 2.dp)
                             )
                         }
                     }
