@@ -17,5 +17,6 @@ data class AutomationEntity(
     val isPost: Boolean = false,
     val isEnabled: Boolean = true,
     val smsPhoneNumbers: String? = null,
-    val smsMessage: String? = null
+    val smsMessage: String? = null,
+    val attachLocation: Boolean = false
 )

@@ -78,6 +78,15 @@ class MainActivity : ComponentActivity() {
                             var processedUrl = event.url
                                 .replace("{{tag_id}}", tagData.tagId)
                                 .replace("{{timestamp}}", System.currentTimeMillis().toString())
+
+                            if (event.attachLocation || processedUrl.contains("{{lat}}") || processedUrl.contains("{{location}}") || processedUrl.contains("{{maps_url}}")) {
+                                val loc = LocationHelper.getCurrentLocation(this@MainActivity)
+                                processedUrl = LocationHelper.processLocationVariables(processedUrl, loc)
+                                if (event.attachLocation && loc != null && !processedUrl.contains("lat=") && !processedUrl.contains("maps.google.com")) {
+                                    val sep = if (processedUrl.contains("?")) "&" else "?"
+                                    processedUrl += "${sep}lat=${loc.latitude}&lon=${loc.longitude}"
+                                }
+                            }
                                 
                             when (event.actionType) {
                                 work.ranjit.nfctags.data.ActionType.OPEN_LINK -> {
@@ -99,9 +108,18 @@ class MainActivity : ComponentActivity() {
                                     }
                                 }
                                 work.ranjit.nfctags.data.ActionType.SEND_SMS -> {
-                                    val processedMessage = (event.smsMessage ?: "")
+                                    var processedMessage = (event.smsMessage ?: "")
                                         .replace("{{tag_id}}", tagData.tagId)
                                         .replace("{{timestamp}}", System.currentTimeMillis().toString())
+
+                                    if (event.attachLocation || processedMessage.contains("{{lat}}") || processedMessage.contains("{{location}}") || processedMessage.contains("{{maps_url}}")) {
+                                        val loc = LocationHelper.getCurrentLocation(this@MainActivity)
+                                        processedMessage = LocationHelper.processLocationVariables(processedMessage, loc)
+                                        if (event.attachLocation && loc != null && !processedMessage.contains("maps.google.com")) {
+                                            processedMessage += "\nLocation: ${LocationHelper.formatMapsUrl(loc.latitude, loc.longitude)}"
+                                        }
+                                    }
+
                                     webhookRes = SmsSender.sendSms(
                                         this@MainActivity,
                                         event.smsPhoneNumbers,

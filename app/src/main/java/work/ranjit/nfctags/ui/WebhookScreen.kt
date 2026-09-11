@@ -4,6 +4,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -19,6 +21,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import work.ranjit.nfctags.data.ActionType
@@ -30,6 +33,7 @@ import android.provider.ContactsContract
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.ui.platform.LocalContext
+import work.ranjit.nfctags.LocationHelper
 import work.ranjit.nfctags.NfcTagData
 import work.ranjit.nfctags.SmsSender
 import work.ranjit.nfctags.data.AutomationDao
@@ -57,6 +61,14 @@ fun WebhookScreen(
         hasSmsPermission = isGranted
     }
 
+    var hasLocationPermission by remember { mutableStateOf(LocationHelper.hasLocationPermission(context)) }
+    val locationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestMultiplePermissions()
+    ) { permissions ->
+        hasLocationPermission = permissions.values.any { it }
+    }
+
+    val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     var showEditor by remember { mutableStateOf(false) }
     var editingAutomation by remember { mutableStateOf<AutomationEntity?>(null) }
     
@@ -68,12 +80,14 @@ fun WebhookScreen(
     var actionType by remember { mutableStateOf(ActionType.WEBHOOK) }
     var smsPhoneNumbers by remember { mutableStateOf("") }
     var smsMessage by remember { mutableStateOf("") }
+    var attachLocation by remember { mutableStateOf(false) }
     
     var tagDropdownExpanded by remember { mutableStateOf(false) }
 
     fun openEditor(automation: AutomationEntity? = null) {
         editingAutomation = automation
         hasSmsPermission = SmsSender.hasSmsPermission(context)
+        hasLocationPermission = LocationHelper.hasLocationPermission(context)
         if (automation != null) {
             selectedTagId = automation.tagId
             eventUrl = automation.url
@@ -82,6 +96,7 @@ fun WebhookScreen(
             selectedAppPackage = automation.appPackage ?: ""
             smsPhoneNumbers = automation.smsPhoneNumbers ?: ""
             smsMessage = automation.smsMessage ?: ""
+            attachLocation = automation.attachLocation
         } else {
             // Auto-select currently scanned tag if it exists in DB
             selectedTagId = if (tagData.tagId.isNotEmpty() && tags.any { it.tagId == tagData.tagId }) tagData.tagId else ""
@@ -91,6 +106,7 @@ fun WebhookScreen(
             selectedAppPackage = ""
             smsPhoneNumbers = ""
             smsMessage = ""
+            attachLocation = false
         }
         showEditor = true
     }
@@ -183,12 +199,18 @@ fun WebhookScreen(
     }
 
     if (showEditor) {
-        ModalBottomSheet(onDismissRequest = { showEditor = false }) {
+        ModalBottomSheet(
+            onDismissRequest = { showEditor = false },
+            sheetState = sheetState
+        ) {
+            val editorScrollState = rememberScrollState()
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
-                    .padding(bottom = 32.dp)
+                    .imePadding()
+                    .verticalScroll(editorScrollState)
+                    .padding(horizontal = 16.dp)
+                    .padding(top = 8.dp, bottom = 48.dp)
             ) {
                 Text(
                     text = if (editingAutomation == null) "New Automation" else "Edit Automation",
@@ -459,6 +481,72 @@ fun WebhookScreen(
                     }
                 }
 
+                Spacer(modifier = Modifier.height(16.dp))
+                Card(
+                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text("📍 Include Geo Coordinates (GPS)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                                Text("Optionally attach real-time GPS location", fontSize = 11.sp, color = Color.Gray)
+                            }
+                            Switch(
+                                checked = attachLocation,
+                                onCheckedChange = { isChecked ->
+                                    attachLocation = isChecked
+                                    if (isChecked && !hasLocationPermission) {
+                                        locationPermissionLauncher.launch(
+                                            arrayOf(
+                                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                                Manifest.permission.ACCESS_COARSE_LOCATION
+                                            )
+                                        )
+                                    }
+                                }
+                            )
+                        }
+
+                        if (attachLocation) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text("Insert dynamic placeholders:", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                            Row(
+                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                OutlinedButton(
+                                    onClick = {
+                                        if (actionType == ActionType.SEND_SMS) {
+                                            smsMessage = if (smsMessage.isBlank()) "{{maps_url}}" else "$smsMessage {{maps_url}}"
+                                        } else {
+                                            eventUrl = if (eventUrl.isBlank()) "{{maps_url}}" else "$eventUrl{{maps_url}}"
+                                        }
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("+ 📍 Maps Link", fontSize = 11.sp)
+                                }
+                                OutlinedButton(
+                                    onClick = {
+                                        if (actionType == ActionType.SEND_SMS) {
+                                            smsMessage = if (smsMessage.isBlank()) "{{lat}}, {{lon}}" else "$smsMessage {{lat}}, {{lon}}"
+                                        } else {
+                                            eventUrl = if (eventUrl.isBlank()) "{{lat}},{{lon}}" else "$eventUrl{{lat}},{{lon}}"
+                                        }
+                                    },
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("+ 🌐 Lat, Lon", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 val saveEnabled = when (actionType) {
                     ActionType.OPEN_APP -> selectedTagId.isNotEmpty() && selectedAppPackage.isNotEmpty()
                     ActionType.SEND_SMS -> selectedTagId.isNotEmpty() && smsPhoneNumbers.isNotBlank() && smsMessage.isNotBlank()
@@ -497,7 +585,8 @@ fun WebhookScreen(
                                         isPost = isPost,
                                         isEnabled = true,
                                         smsPhoneNumbers = if (actionType == ActionType.SEND_SMS) smsPhoneNumbers.trim() else null,
-                                        smsMessage = if (actionType == ActionType.SEND_SMS) smsMessage.trim() else null
+                                        smsMessage = if (actionType == ActionType.SEND_SMS) smsMessage.trim() else null,
+                                        attachLocation = attachLocation
                                     )
                                     if (editingAutomation != null) {
                                         automationDao.updateAutomation(newAutomation)

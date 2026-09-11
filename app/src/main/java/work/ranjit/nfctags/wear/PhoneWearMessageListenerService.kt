@@ -12,6 +12,7 @@ import kotlinx.coroutines.launch
 import work.ranjit.nfctags.NetworkManager
 import work.ranjit.nfctags.data.ActionType
 import work.ranjit.nfctags.data.AppDatabase
+import work.ranjit.nfctags.LocationHelper
 import work.ranjit.nfctags.SmsSender
 import work.ranjit.nfctags.data.ScanHistoryEntity
 
@@ -47,9 +48,18 @@ class PhoneWearMessageListenerService : WearableListenerService() {
             val tagEntity = database.tagDao().getTagById(tagId)
 
             if (event != null && event.isEnabled) {
-                val processedUrl = event.url
+                var processedUrl = event.url
                     .replace("{{tag_id}}", tagId)
                     .replace("{{timestamp}}", System.currentTimeMillis().toString())
+
+                if (event.attachLocation || processedUrl.contains("{{lat}}") || processedUrl.contains("{{location}}") || processedUrl.contains("{{maps_url}}")) {
+                    val loc = LocationHelper.getCurrentLocation(applicationContext)
+                    processedUrl = LocationHelper.processLocationVariables(processedUrl, loc)
+                    if (event.attachLocation && loc != null && !processedUrl.contains("lat=") && !processedUrl.contains("maps.google.com")) {
+                        val sep = if (processedUrl.contains("?")) "&" else "?"
+                        processedUrl += "${sep}lat=${loc.latitude}&lon=${loc.longitude}"
+                    }
+                }
 
                 var resultStr = ""
                 when (event.actionType) {
@@ -77,9 +87,18 @@ class PhoneWearMessageListenerService : WearableListenerService() {
                         }
                     }
                     ActionType.SEND_SMS -> {
-                        val processedMessage = (event.smsMessage ?: "")
+                        var processedMessage = (event.smsMessage ?: "")
                             .replace("{{tag_id}}", tagId)
                             .replace("{{timestamp}}", System.currentTimeMillis().toString())
+
+                        if (event.attachLocation || processedMessage.contains("{{lat}}") || processedMessage.contains("{{location}}") || processedMessage.contains("{{maps_url}}")) {
+                            val loc = LocationHelper.getCurrentLocation(applicationContext)
+                            processedMessage = LocationHelper.processLocationVariables(processedMessage, loc)
+                            if (event.attachLocation && loc != null && !processedMessage.contains("maps.google.com")) {
+                                processedMessage += "\nLocation: ${LocationHelper.formatMapsUrl(loc.latitude, loc.longitude)}"
+                            }
+                        }
+
                         resultStr = SmsSender.sendSms(
                             applicationContext,
                             event.smsPhoneNumbers,

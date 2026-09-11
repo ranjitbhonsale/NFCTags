@@ -29,7 +29,8 @@ class BackupManager(private val context: Context, private val database: AppDatab
                         isEnabled = it.isEnabled,
                         appPackage = it.appPackage,
                         smsPhoneNumbers = it.smsPhoneNumbers,
-                        smsMessage = it.smsMessage
+                        smsMessage = it.smsMessage,
+                        attachLocation = it.attachLocation
                     ) 
                 }
             )
@@ -87,7 +88,8 @@ class BackupManager(private val context: Context, private val database: AppDatab
                             isEnabled = auto.isEnabled,
                             appPackage = auto.appPackage,
                             smsPhoneNumbers = auto.smsPhoneNumbers,
-                            smsMessage = auto.smsMessage
+                            smsMessage = auto.smsMessage,
+                            attachLocation = auto.attachLocation
                         )
                     )
                 } else {
@@ -100,7 +102,8 @@ class BackupManager(private val context: Context, private val database: AppDatab
                             isEnabled = auto.isEnabled,
                             appPackage = auto.appPackage,
                             smsPhoneNumbers = auto.smsPhoneNumbers,
-                            smsMessage = auto.smsMessage
+                            smsMessage = auto.smsMessage,
+                            attachLocation = auto.attachLocation
                         )
                     )
                 }

@@ -25,5 +25,6 @@ data class SerializableAutomation(
     val isEnabled: Boolean = true,
     val appPackage: String? = null,
     val smsPhoneNumbers: String? = null,
-    val smsMessage: String? = null
+    val smsMessage: String? = null,
+    val attachLocation: Boolean = false
 )
