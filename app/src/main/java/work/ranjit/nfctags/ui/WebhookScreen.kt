@@ -187,7 +187,8 @@ fun WebhookScreen(
                                 ActionType.OPEN_APP -> "Open App"
                                 ActionType.SEND_SMS -> "Send Direct SMS"
                             }
-                            Text(text = typeStr, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
+                            val locBadge = if (automation.attachLocation || automation.smsMessage?.contains("maps.google.com") == true || automation.smsMessage?.contains("{{maps_url}}") == true || automation.url.contains("{{maps_url}}")) " • 📍 Maps Attached" else ""
+                            Text(text = "$typeStr$locBadge", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.secondary)
                         }
                         IconButton(onClick = { openEditor(automation) }) {
                             Icon(Icons.Default.Edit, contentDescription = "Edit")
@@ -450,12 +451,105 @@ fun WebhookScreen(
                         maxLines = 5,
                         modifier = Modifier.fillMaxWidth()
                     )
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(top = 6.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        OutlinedButton(
+                            onClick = {
+                                smsMessage = if (smsMessage.isBlank()) "{{maps_url}}" else "$smsMessage {{maps_url}}"
+                                attachLocation = true
+                                if (!hasLocationPermission) {
+                                    locationPermissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("+ 📍 Maps Link", fontSize = 11.sp)
+                        }
+                        OutlinedButton(
+                            onClick = {
+                                smsMessage = if (smsMessage.isBlank()) "{{lat}}, {{lon}}" else "$smsMessage {{lat}}, {{lon}}"
+                                attachLocation = true
+                                if (!hasLocationPermission) {
+                                    locationPermissionLauncher.launch(
+                                        arrayOf(
+                                            Manifest.permission.ACCESS_FINE_LOCATION,
+                                            Manifest.permission.ACCESS_COARSE_LOCATION
+                                        )
+                                    )
+                                }
+                            },
+                            contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text("+ 🌐 Lat, Lon", fontSize = 11.sp)
+                        }
+                    }
+
                     Text(
-                        text = "Dynamic tags available: {{tag_id}}, {{timestamp}}",
+                        text = "Dynamic tags: {{tag_id}}, {{timestamp}}, {{maps_url}}, {{lat}}, {{lon}}",
                         style = MaterialTheme.typography.bodySmall,
                         color = Color.Gray,
                         modifier = Modifier.padding(top = 4.dp, start = 4.dp)
                     )
+
+                    Spacer(modifier = Modifier.height(12.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (attachLocation) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                                             else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("📍 Attach Google Maps Location", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("Appends https://maps.google.com/?q=lat,lon to SMS", fontSize = 11.sp, color = Color.Gray)
+                                }
+                                Switch(
+                                    checked = attachLocation,
+                                    onCheckedChange = { isChecked ->
+                                        attachLocation = isChecked
+                                        if (isChecked && !hasLocationPermission) {
+                                            locationPermissionLauncher.launch(
+                                                arrayOf(
+                                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                                )
+                                            )
+                                        }
+                                    }
+                                )
+                            }
+                            if (attachLocation && !hasLocationPermission) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        locationPermissionLauncher.launch(
+                                            arrayOf(
+                                                Manifest.permission.ACCESS_FINE_LOCATION,
+                                                Manifest.permission.ACCESS_COARSE_LOCATION
+                                            )
+                                        )
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text("Grant Location Permission", color = Color.White, fontSize = 12.sp)
+                                }
+                            }
+                        }
+                    }
 
                     if (!hasSmsPermission) {
                         Spacer(modifier = Modifier.height(12.dp))
@@ -481,66 +575,63 @@ fun WebhookScreen(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
-                Card(
-                    colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant),
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Text("📍 Include Geo Coordinates (GPS)", fontWeight = FontWeight.Bold, fontSize = 14.sp)
-                                Text("Optionally attach real-time GPS location", fontSize = 11.sp, color = Color.Gray)
-                            }
-                            Switch(
-                                checked = attachLocation,
-                                onCheckedChange = { isChecked ->
-                                    attachLocation = isChecked
-                                    if (isChecked && !hasLocationPermission) {
-                                        locationPermissionLauncher.launch(
-                                            arrayOf(
-                                                Manifest.permission.ACCESS_FINE_LOCATION,
-                                                Manifest.permission.ACCESS_COARSE_LOCATION
-                                            )
-                                        )
-                                    }
-                                }
-                            )
-                        }
-
-                        if (attachLocation) {
-                            Spacer(modifier = Modifier.height(8.dp))
-                            Text("Insert dynamic placeholders:", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                if (actionType == ActionType.WEBHOOK || actionType == ActionType.OPEN_LINK) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Card(
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (attachLocation) MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.45f)
+                                             else MaterialTheme.colorScheme.surfaceVariant
+                        ),
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
                             Row(
-                                modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalAlignment = Alignment.CenterVertically,
+                                modifier = Modifier.fillMaxWidth()
                             ) {
-                                OutlinedButton(
-                                    onClick = {
-                                        if (actionType == ActionType.SEND_SMS) {
-                                            smsMessage = if (smsMessage.isBlank()) "{{maps_url}}" else "$smsMessage {{maps_url}}"
-                                        } else {
-                                            eventUrl = if (eventUrl.isBlank()) "{{maps_url}}" else "$eventUrl{{maps_url}}"
-                                        }
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
-                                ) {
-                                    Text("+ 📍 Maps Link", fontSize = 11.sp)
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text("📍 Include Geo Coordinates (GPS)", fontWeight = FontWeight.Bold, fontSize = 13.sp)
+                                    Text("Attach real-time GPS coordinates to URL", fontSize = 11.sp, color = Color.Gray)
                                 }
-                                OutlinedButton(
-                                    onClick = {
-                                        if (actionType == ActionType.SEND_SMS) {
-                                            smsMessage = if (smsMessage.isBlank()) "{{lat}}, {{lon}}" else "$smsMessage {{lat}}, {{lon}}"
-                                        } else {
-                                            eventUrl = if (eventUrl.isBlank()) "{{lat}},{{lon}}" else "$eventUrl{{lat}},{{lon}}"
+                                Switch(
+                                    checked = attachLocation,
+                                    onCheckedChange = { isChecked ->
+                                        attachLocation = isChecked
+                                        if (isChecked && !hasLocationPermission) {
+                                            locationPermissionLauncher.launch(
+                                                arrayOf(
+                                                    Manifest.permission.ACCESS_FINE_LOCATION,
+                                                    Manifest.permission.ACCESS_COARSE_LOCATION
+                                                )
+                                            )
                                         }
-                                    },
-                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                    }
+                                )
+                            }
+
+                            if (attachLocation) {
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text("Insert dynamic placeholders:", fontSize = 11.sp, color = MaterialTheme.colorScheme.primary)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth().padding(top = 4.dp),
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text("+ 🌐 Lat, Lon", fontSize = 11.sp)
+                                    OutlinedButton(
+                                        onClick = {
+                                            eventUrl = if (eventUrl.isBlank()) "{{maps_url}}" else "$eventUrl{{maps_url}}"
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("+ 📍 Maps Link", fontSize = 11.sp)
+                                    }
+                                    OutlinedButton(
+                                        onClick = {
+                                            eventUrl = if (eventUrl.isBlank()) "{{lat}},{{lon}}" else "$eventUrl{{lat}},{{lon}}"
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                    ) {
+                                        Text("+ 🌐 Lat, Lon", fontSize = 11.sp)
+                                    }
                                 }
                             }
                         }

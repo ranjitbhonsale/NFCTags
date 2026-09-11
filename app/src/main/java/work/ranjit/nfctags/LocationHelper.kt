@@ -1,4 +1,4 @@
-﻿package work.ranjit.nfctags
+package work.ranjit.nfctags
 
 import android.Manifest
 import android.content.Context
@@ -32,16 +32,25 @@ object LocationHelper {
     fun getLastKnownLocation(context: Context): Location? {
         if (!hasLocationPermission(context)) return null
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return null
-        val providers = locationManager.getProviders(true)
+        
+        val providerList = mutableListOf(
+            LocationManager.GPS_PROVIDER,
+            LocationManager.NETWORK_PROVIDER,
+            LocationManager.PASSIVE_PROVIDER
+        )
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+            providerList.add(LocationManager.FUSED_PROVIDER)
+        }
+
         var bestLocation: Location? = null
-        for (provider in providers) {
+        for (provider in providerList) {
             try {
                 val loc = locationManager.getLastKnownLocation(provider) ?: continue
-                if (bestLocation == null || loc.accuracy < bestLocation.accuracy || loc.time > bestLocation.time) {
+                if (bestLocation == null || loc.time > bestLocation.time) {
                     bestLocation = loc
                 }
-            } catch (e: SecurityException) {
-                Log.e(TAG, "SecurityException fetching location for $provider", e)
+            } catch (e: Exception) {
+                Log.e(TAG, "Error fetching last known location from $provider", e)
             }
         }
         return bestLocation
@@ -52,7 +61,7 @@ object LocationHelper {
         val locationManager = context.getSystemService(Context.LOCATION_SERVICE) as? LocationManager ?: return@withContext null
 
         val lastKnown = getLastKnownLocation(context)
-        if (lastKnown != null && (System.currentTimeMillis() - lastKnown.time) < 120_000) {
+        if (lastKnown != null && (System.currentTimeMillis() - lastKnown.time) < 60_000) {
             return@withContext lastKnown
         }
 
@@ -63,20 +72,22 @@ object LocationHelper {
                     locationManager.isProviderEnabled(LocationManager.NETWORK_PROVIDER) -> LocationManager.NETWORK_PROVIDER
                     else -> LocationManager.PASSIVE_PROVIDER
                 }
-                val freshLocation = suspendCancellableCoroutine<Location?> { cont ->
-                    val cancellationSignal = CancellationSignal()
-                    cont.invokeOnCancellation { cancellationSignal.cancel() }
-                    try {
-                        locationManager.getCurrentLocation(
-                            provider,
-                            cancellationSignal,
-                            context.mainExecutor
-                        ) { loc ->
-                            cont.resume(loc)
+                val freshLocation = kotlinx.coroutines.withTimeoutOrNull(3500L) {
+                    suspendCancellableCoroutine<Location?> { cont ->
+                        val cancellationSignal = CancellationSignal()
+                        cont.invokeOnCancellation { cancellationSignal.cancel() }
+                        try {
+                            locationManager.getCurrentLocation(
+                                provider,
+                                cancellationSignal,
+                                context.mainExecutor
+                            ) { loc ->
+                                if (cont.isActive) cont.resume(loc)
+                            }
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Error in getCurrentLocation callback", e)
+                            if (cont.isActive) cont.resume(null)
                         }
-                    } catch (e: Exception) {
-                        Log.e(TAG, "Error in getCurrentLocation callback", e)
-                        cont.resume(lastKnown)
                     }
                 }
                 if (freshLocation != null) return@withContext freshLocation
@@ -88,7 +99,9 @@ object LocationHelper {
         return@withContext lastKnown
     }
 
-    fun formatMapsUrl(lat: Double, lon: Double): String = "https://maps.google.com/?q=$lat,$lon"
+    fun formatMapsUrl(lat: Double, lon: Double): String {
+        return String.format(java.util.Locale.US, "https://maps.google.com/?q=%.6f,%.6f", lat, lon)
+    }
 
     fun processLocationVariables(text: String, location: Location?): String {
         if (location == null) {
